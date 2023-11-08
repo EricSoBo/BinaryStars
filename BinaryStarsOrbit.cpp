@@ -16,11 +16,17 @@ GLuint texture[1];
 static const double G = 1.0;
 static double last_x = 0.0;
 static const float dt = 0.01;
+float t = 0.0;
 bool Pause = true;
 GLfloat const red[3] = {1,0,0};
 GLfloat const green[3] = {0,1,0};
 GLfloat const blue[3] = {0,0,1};
 GLfloat const gray[3] = {0.5,0.5,0.5};
+GLfloat const yellow[3] = {1,1,0};
+GLfloat const purple[3] = {1,0,1};
+GLfloat const cyan[3] = {0,1,1};
+GLfloat const white[3] = {1,1,1};
+GLfloat const black[3] = {0,0,0};
 
 int LoadBMP(const char * filename)
 {
@@ -129,8 +135,10 @@ class Sphere{
         std::vector<glm::vec3> points;
         std::vector<std::vector<unsigned int>> indices;
         glm::vec3 _pos;
+        bool make_trail;
+        bool make_doppler;
 
-        Sphere(const std::string name, const double radius, const unsigned int sectorCount, const unsigned int stackCount, const glm::vec3 pos, const glm::vec3 velocity, const GLfloat color[], const double mass = 10.0, const bool make_trail = true){
+        Sphere(const std::string name, const double radius, const unsigned int sectorCount, const unsigned int stackCount, const glm::vec3 pos, const glm::vec3 velocity, const GLfloat color[], const double mass = 10.0, const bool make_trail = true, const bool make_doppler = false){
             this->name = name;
             this->_pos = pos;
             this->mass = mass;
@@ -139,6 +147,7 @@ class Sphere{
             this->color[1] = color[1];
             this->color[2] = color[2];
             this->make_trail = make_trail;
+            this->make_doppler = make_doppler;
             this->sectorCount = sectorCount;
             this->stackCount = stackCount;
             this->velocity = velocity;
@@ -206,6 +215,8 @@ class Sphere{
 
         void DrawSphere(){
             glPushMatrix();
+            if(make_doppler)
+                DopplerEffect();
             glColor3fv(color);
             glTranslated(_pos.x, _pos.y, _pos.z);
             glPolygonMode(GL_FRONT_AND_BACK, GL_LINE);
@@ -230,12 +241,27 @@ class Sphere{
             }
             glPopMatrix();
             trail.push_back(_pos);
-            for(int i = 0; i < trail.size(); i++){
-                glPointSize(radius/2);
-                glBegin(GL_POINTS);
-                    glColor3f(color[0], color[1], color[2]);
-                    glVertex3f(trail[i].x, trail[i].y, trail[i].z);
-                glEnd();
+            if(make_trail){
+                for(int i = 0; i < trail.size(); i++){
+                    glPointSize(radius/2);
+                    glBegin(GL_POINTS);
+                        glColor3f(color[0], color[1], color[2]);
+                        glVertex3f(trail[i].x, trail[i].y, trail[i].z);
+                    glEnd();
+                }
+            }
+        }
+
+        void DopplerEffect(){
+            if(velocity.y > 0){
+                color[0] = velocity.y/0.5;
+                color[1] = 0;
+                color[2] = 0;
+            }
+            else{
+                color[0] = 0;
+                color[1] = 0;
+                color[2] = -velocity.y/0.5;
             }
         }
 
@@ -250,7 +276,6 @@ class Sphere{
         unsigned int sectorCount;
         unsigned int stackCount;
         std::vector<glm::vec3> trail;
-        bool make_trail;
 };
 
 void DrawDistance(Sphere& s1, Sphere& s2){
@@ -358,31 +383,31 @@ int main(int argc, char** argv){
     glfwSetCursorPosCallback(window, mouse_callback);
     glfwSetKeyCallback(window, key_callback);
 
-    Sphere Earth("Terra", 0.5, 50, 50, glm::vec3(0.0, 2.0, 0.0), glm::vec3(0.0, 0.0, 0.5), blue, 2.0);
-    Sphere Mars("Marte", 0.2, 50, 50, glm::vec3(0.0, -2.0, 0.0), glm::vec3(0.0, 0.0, -0.5), red, 2.0);
+    Sphere Star1("Star1", 0.5, 50, 50, glm::vec3(0.0, 2.0, 0.0), glm::vec3(0.5, 0.0, 0.0), blue, 2.0);
+    Sphere Star2("Star2", 0.2, 50, 50, glm::vec3(0.0, -2.0, 0.0), glm::vec3(-0.5, 0.0, 0.0), red, 2.0);
     //Sphere CenterOfMass("CM", 0.0, 50, 50, glm::vec3(0.0, 3.0, 0.0), glm::vec3(0.0, 0.0, 0.0), 1000.0);
-    Entities.push_back(&Mars);
-    Entities.push_back(&Earth);
-
+    Entities.push_back(&Star2);
+    Entities.push_back(&Star1);
+    Star2.make_trail = false;
+    //Star1.make_trail = false;
     while(!glfwWindowShouldClose(window)){
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         glLoadIdentity();
         Redimensiona(largura, altura);
         camera.Look();
         //GridLand();
-        Earth.DrawSphere();
-        Mars.DrawSphere();
+        Star1.DrawSphere();
+        Star2.DrawSphere();
         if(!Pause){
-            Earth.CalculateAcceleration(Entities);
-            Mars.CalculateAcceleration(Entities);
-            Earth.UpdatePosition(Entities);
-            Mars.UpdatePosition(Entities);
+            Star1.CalculateAcceleration(Entities);
+            Star2.CalculateAcceleration(Entities);
+            Star1.UpdatePosition(Entities);
+            Star2.UpdatePosition(Entities);
+            t += dt;
+            std::cout << "t = " << t << std::endl;
         }
-        DrawDistance(Mars, Earth);
+        DrawDistance(Star2, Star1);
         
-        //Sun.DrawSphere();
-        //Earth.DrawSphere();
-        //std::cout << x << std::endl;
         KeyEvents(window, camera);
 
         glfwSwapBuffers(window);
